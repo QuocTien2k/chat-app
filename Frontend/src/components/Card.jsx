@@ -1,12 +1,13 @@
 import { toast } from "react-toastify";
-const Card = ({ user, isOnline }) => {
+const Card = ({ user, isOnline, onSelect }) => {
     const handleClick = () => {
         const token = localStorage.getItem("token");
 
         if (!token) {
             toast.warning("Vui lòng đăng nhập để chat!");
         } else {
-            console.log(`Mở chat với ${user.name} - Tạm thời chưa làm bước này`);
+            console.log(`Mở chat với ${user.name}`);
+            onSelect(); // Mở chat với user này
         }
     };
     return (

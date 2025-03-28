@@ -4,6 +4,7 @@ import Card from "../components/Card";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { io } from "socket.io-client";
+import ChatBox from "../components/ChatBox";
 
 const socket = io("http://localhost:5000"); // 🔥 Kết nối đến server WebSocket
 const Home = () => {
@@ -12,6 +13,7 @@ const Home = () => {
     const user = JSON.parse(localStorage.getItem("user"));
     //console.log(user);
     const [onlineUsers, setOnlineUsers] = useState({}); // Lưu trạng thái online
+    const [chatUsers, setChatUsers] = useState([]);
 
     useEffect(() => {
         const fetchUsers = async () => {
@@ -72,6 +74,36 @@ const Home = () => {
         }
     };
 
+    // Hàm mở chat
+    const max_chatboxs = 3; // Giới hạn số lượng chatbox mở cùng lúc
+    const handleOpenChat = (user) => {
+        if (!user._id) {
+            console.error("User ID is missing:", user);
+            return;
+        }
+
+        setChatUsers((prev) => {
+            //kiểm tra nếu user đã có trong danh sách -> không thêm nữa
+            if (prev.some((u) => u._id === user._id)) {
+                return prev;
+            }
+
+            //kiểm tra số lượng chatbox đang mở
+            if (prev.length >= max_chatboxs) {
+                return [...prev.slice(1), user]; // xóa chatbox đầu tiên và thêm chatbox mới
+            }
+
+            //chưa đủ số lượng chatbox -> thêm vào danh sách
+            return [...prev, user];
+        })
+
+    };
+
+    // Hàm đóng chat
+    const handleCloseChat = (userId) => {
+        setChatUsers((prev) => prev.filter((user) => user._id !== userId));
+    };
+
     return (
         <div className="p-5">
             {user && <h1 className="text-2xl font-bold text-center mb-5">Xin chào, {user?.name}</h1>}
@@ -89,9 +121,32 @@ const Home = () => {
             <h1 className="text-2xl font-bold text-center mb-5">Danh sách User</h1>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {users.map((user) => (
-                    <Card key={user._id} user={user} isOnline={onlineUsers[user._id] === "online"} />
+                    <Card
+                        key={user._id}
+                        user={user}
+                        isOnline={onlineUsers[user._id] === "online"}
+                        onSelect={() => handleOpenChat(user)}
+                    />
                 ))}
             </div>
+
+            {/* Hiển thị các cửa sổ chat đang mở */}
+            {/* <div className="fixed bottom-4 right-4 flex flex-col gap-4">
+                {chatUsers.map((user, index) => (
+                    <ChatBox
+                        key={user._id}
+                        user={user}
+                        onClose={() => handleCloseChat(user._id)}
+                        style={{ right: `${index * 280}px`, position: "absolute", bottom: "0" }}
+                    />
+                ))}
+            </div> */}
+            <div className="fixed bottom-4 right-4 flex gap-4">
+                {chatUsers.map((user, index) => (
+                    <ChatBox key={`${user._id}-${index}`} user={user} onClose={() => handleCloseChat(user._id)} />
+                ))}
+            </div>
+
         </div>
     );
 };
