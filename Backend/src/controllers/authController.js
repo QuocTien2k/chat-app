@@ -106,14 +106,15 @@ const logoutUser = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
 // 📌 Lấy danh sách tất cả Users (loại bỏ user đang đăng nhập)
 const getAllUsers = async (req, res) => {
   try {
-    console.log("📌 Yêu cầu lấy danh sách users...");
-    console.log(
-      "📌 User đang đăng nhập:",
-      req.user ? req.user : "❌ Không có user!"
-    );
+    //console.log("📌 Yêu cầu lấy danh sách users...");
+    // console.log(
+    //   "📌 User đang đăng nhập:",
+    //   req.user ? req.user : "❌ Không có user!"
+    // );
 
     let users;
     if (req.user) {
@@ -126,10 +127,10 @@ const getAllUsers = async (req, res) => {
       users = await User.find().select("-password");
     }
 
-    console.log("📌 Danh sách users trả về:", users);
+    //console.log("📌 Danh sách users trả về:", users);
     res.json(users);
   } catch (error) {
-    console.error("❌ Lỗi Backend:", error);
+    //console.error("❌ Lỗi Backend:", error);
     res.status(500).json({ message: error.message });
   }
 };
