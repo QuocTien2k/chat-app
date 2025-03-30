@@ -10,7 +10,7 @@ const socket = io("http://localhost:5000"); // 🔥 Kết nối đến server We
 const Home = () => {
     const [users, setUsers] = useState([]);
     const navigate = useNavigate();
-    const user = JSON.parse(localStorage.getItem("user"));
+    const currentUser = JSON.parse(localStorage.getItem("user"));
     //console.log(user);
     const [onlineUsers, setOnlineUsers] = useState({}); // Lưu trạng thái online
     const [chatUsers, setChatUsers] = useState([]);
@@ -76,27 +76,36 @@ const Home = () => {
 
     // Hàm mở chat
     const max_chatboxs = 3; // Giới hạn số lượng chatbox mở cùng lúc
-    const handleOpenChat = (user) => {
-        if (!user._id) {
-            console.error("User ID is missing:", user);
+    const handleOpenChat = (otherUser) => {
+        const currentUser = JSON.parse(localStorage.getItem("user")); // Lấy user đang đăng nhập
+
+        //console.log("🟢 Người mở chat (currentUser):", currentUser);
+        //console.log("🔵 Người được chọn (otherUser):", otherUser);
+
+        if (!otherUser || !otherUser._id) {
+            //console.error("❌ Không có thông tin người chat:", otherUser);
+            return;
+        }
+
+        if (otherUser._id === currentUser._id) {
+            console.warn("⚠️ Không thể chat với chính mình!");
             return;
         }
 
         setChatUsers((prev) => {
-            //kiểm tra nếu user đã có trong danh sách -> không thêm nữa
-            if (prev.some((u) => u._id === user._id)) {
+            if (prev.some((u) => u._id === otherUser._id)) {
+                //console.log("✅ Đã có trong danh sách chat.");
                 return prev;
             }
 
-            //kiểm tra số lượng chatbox đang mở
             if (prev.length >= max_chatboxs) {
-                return [...prev.slice(1), user]; // xóa chatbox đầu tiên và thêm chatbox mới
+                //console.log("🔄 Giới hạn chatbox, xóa chatbox đầu tiên.");
+                return [...prev.slice(1), otherUser];
             }
 
-            //chưa đủ số lượng chatbox -> thêm vào danh sách
-            return [...prev, user];
-        })
-
+            //console.log("➕ Thêm user mới vào danh sách chat.");
+            return [...prev, otherUser];
+        });
     };
 
     // Hàm đóng chat
@@ -106,9 +115,9 @@ const Home = () => {
 
     return (
         <div className="p-5">
-            {user && <h1 className="text-2xl font-bold text-center mb-5">Xin chào, {user?.name}</h1>}
+            {currentUser && <h1 className="text-2xl font-bold text-center mb-5">Xin chào, {currentUser?.name}</h1>}
             <div className="my-3">
-                {user ? (
+                {currentUser ? (
                     <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded cursor-pointer">
                         Đăng Xuất
                     </button>
@@ -120,30 +129,21 @@ const Home = () => {
             </div>
             <h1 className="text-2xl font-bold text-center mb-5">Danh sách User</h1>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {users.map((user) => (
+                {users.map((otherUser) => (
                     <Card
-                        key={user._id}
-                        user={user}
-                        isOnline={onlineUsers[user._id] === "online"}
-                        onSelect={() => handleOpenChat(user)}
+                        key={otherUser._id}
+                        user={otherUser} // Đây là user khác, không phải currentUser
+                        isOnline={onlineUsers[otherUser._id] === "online"}
+                        onSelect={() => handleOpenChat(otherUser)}
                     />
                 ))}
             </div>
 
             {/* Hiển thị các cửa sổ chat đang mở */}
-            {/* <div className="fixed bottom-4 right-4 flex flex-col gap-4">
-                {chatUsers.map((user, index) => (
-                    <ChatBox
-                        key={user._id}
-                        user={user}
-                        onClose={() => handleCloseChat(user._id)}
-                        style={{ right: `${index * 280}px`, position: "absolute", bottom: "0" }}
-                    />
-                ))}
-            </div> */}
             <div className="fixed bottom-4 right-4 flex gap-4">
-                {chatUsers.map((user, index) => (
-                    <ChatBox key={`${user._id}-${index}`} user={user} onClose={() => handleCloseChat(user._id)} />
+                {chatUsers.map((chatUser) => (
+                    <ChatBox key={chatUser._id} user={chatUser} currentUser={currentUser} onClose={handleCloseChat} />
+
                 ))}
             </div>
 
