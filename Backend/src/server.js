@@ -14,6 +14,7 @@ const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
     origin: process.env.FRONTEND_URL || "*", // 🔥 Chỉ cho phép frontend truy cập
+    methods: ["GET", "POST"],
   },
 });
 
@@ -31,7 +32,7 @@ app.use("/api/chat", chatRoutes);
 
 // 📌 Quản lý user online
 let onlineUsers = new Map();
-
+app.set("onlineUsers", onlineUsers);
 io.on("connection", (socket) => {
   //console.log("🟢 User connected:", socket.id);
 
