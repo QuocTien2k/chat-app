@@ -27,7 +27,7 @@ const sendMessage = async (req, res) => {
     const receiverSocketId = onlineUsers.get(receiver);
 
     if (receiverSocketId) {
-      console.log(`📩 Gửi tin nhắn realtime đến ${receiverSocketId}`);
+      //console.log(`📩 Gửi tin nhắn realtime đến ${receiverSocketId}`);
       io.to(receiverSocketId).emit("receiveMessage", message);
     }
 
@@ -59,7 +59,7 @@ const getMessages = async (req, res) => {
         { sender, receiver },
         { sender: receiver, receiver: sender },
       ],
-    }).sort({ createdAt: -1 }); // Mới nhất trước
+    }).sort({ createdAt: 1 }); // Mới nhất trước
 
     res.status(200).json(messages);
   } catch (error) {

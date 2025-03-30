@@ -6,6 +6,7 @@ const authRoutes = require("./routes/authRoutes");
 const socketIo = require("socket.io");
 const http = require("http");
 const cors = require("cors");
+const Message = require("./models/Message");
 
 const app = express();
 connectDB(); // Kết nối MongoDB
@@ -39,19 +40,33 @@ io.on("connection", (socket) => {
   // 📌 User vào app sẽ gửi ID để server lưu lại
   socket.on("join", (userId) => {
     onlineUsers.set(userId, socket.id);
-    //console.log("User online:", onlineUsers);
+    console.log("✅ User online:", userId, " | Socket ID:", socket.id); // Log kiểm tra
 
     // 🔥 Thông báo user online cho tất cả client
     io.emit("updateUserStatus", { userId, status: "online" });
   });
 
   // 📌 Nhận tin nhắn từ client và gửi ngay đến receiver
-  socket.on("sendMessage", (message) => {
+  socket.on("sendMessage", async (message) => {
     const { sender, receiver, content } = message;
-    const receiverSocketId = onlineUsers.get(receiver);
 
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("receiveMessage", message);
+    try {
+      // 📌 Lưu vào database trước khi gửi qua socket
+      const newMessage = new Message({
+        sender,
+        receiver,
+        content,
+        seen: false, // Mặc định chưa đọc
+      });
+
+      await newMessage.save(); // Lưu vào MongoDB
+
+      const receiverSocketId = onlineUsers.get(receiver);
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("receiveMessage", message);
+      }
+    } catch (err) {
+      console.error("❌ Lỗi khi lưu tin nhắn:", err);
     }
   });
 
