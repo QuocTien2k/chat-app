@@ -3,11 +3,16 @@ import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
+import Card from "../components/Card";
+import { socket, listenOnlineUsers } from "../socket/socket";
+import Chat from "../components/Chat";
 
 const Home = () => {
     const { user, token, logout } = useAuth();
     const [users, setUsers] = useState([]);
     const navigate = useNavigate();
+    const [selectedUser, setSelectedUser] = useState(null);
+    const [showChat, setShowChat] = useState(false);
 
     // 📌 Fetch danh sách users từ API
     useEffect(() => {
@@ -22,17 +27,28 @@ const Home = () => {
         };
 
         fetchUsers();
+
+        // 📌 Lắng nghe danh sách online từ socket
+        listenOnlineUsers((onlineUsers) => {
+            setUsers(prevUsers =>
+                prevUsers.map(u => ({
+                    ...u,
+                    isOnline: onlineUsers.includes(u._id), // ✅ Đánh dấu online đúng
+                }))
+            );
+        });
+
     }, [user]); // Khi user thay đổi, gọi lại API
 
     // 📌 Khi click vào Card user
-    const handleUserClick = (selectedUser) => {
+    const handleUserClick = (user) => {
         if (!token) {
             toast.warning("Bạn cần đăng nhập để nhắn tin!");
             return;
         }
 
-        // 🟢 Nếu đã đăng nhập, điều hướng đến trang chat (ví dụ)
-        navigate(`/chat/${selectedUser._id}`);
+        setSelectedUser(user);
+        setShowChat(true);
     };
 
     return (
@@ -41,16 +57,25 @@ const Home = () => {
             <h2 className="text-2xl font-bold m-4">Danh Sách Users</h2>
 
             {/* 📌 Danh sách Users */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {users.map((u) => (
-                    <div key={u._id} className="p-4 border rounded shadow-md cursor-pointer hover:shadow-lg"
-                        onClick={() => handleUserClick(u)}>
-                        <img src={u.avatar || "default-avatar.png"} alt="Avatar" className="w-16 h-16 rounded-full mx-auto" />
-                        <h3 className="text-xl font-semibold text-center">{u.name}</h3>
-                        <p className="text-center text-gray-600">{u.email}</p>
-                    </div>
-                ))}
-            </div>
+            {!showChat ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {users.map((u) => (
+                        <Card
+                            key={u._id}
+                            user={u}
+                            onClick={() => handleUserClick(u)}
+                            isOnline={u.isOnline}
+                        />
+                    ))}
+                </div>
+            ) : (
+                <Chat
+                    socket={socket} // ✅ Truyền socket
+                    user={user} // ✅ User hiện tại
+                    selectedUser={selectedUser} // ✅ User đang chat
+                    onClose={() => setShowChat(false)} // ✅ Đóng chat
+                />
+            )}
 
             {/* 📌 Nếu chưa đăng nhập, hiển thị nút đăng nhập */}
             {!user ? (

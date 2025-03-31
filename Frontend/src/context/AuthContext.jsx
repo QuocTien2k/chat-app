@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
-import { emitUserOnline } from "../socket/socket";
+import { disconnectSocket, emitUserOnline } from "../socket/socket";
 
 const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
@@ -64,6 +64,8 @@ export const AuthProvider = ({ children }) => {
     const logout = async () => {
         try {
             await axios.post("http://localhost:5000/api/auth/logout");
+            // Ngắt kết nối socket
+            disconnectSocket();
         } catch (error) {
             console.error("Lỗi khi đăng xuất:", error);
         }

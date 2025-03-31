@@ -1,31 +1,21 @@
-import { toast } from "react-toastify";
-const Card = ({ user, isOnline, onSelect }) => {
-    const handleClick = () => {
-        const token = localStorage.getItem("token");
-
-        if (!token) {
-            toast.warning("Vui lòng đăng nhập để chat!");
-        } else {
-            console.log(`Mở chat với ${user.name}`);
-            onSelect(); // Mở chat với user này
-        }
-    };
+const Card = ({ user, onClick, isOnline }) => {
     return (
-        <div onClick={handleClick} className="bg-white shadow-md rounded-lg p-4 flex flex-col items-center cursor-pointer">
-            <div className="relative">
-                <span
-                    className={`absolute top-1 right-0 w-4 h-4 border-2 border-white rounded-full ${isOnline ? "bg-green-500" : "bg-gray-400"
-                        }`}
-                ></span>
-                <img
-                    src={user.avatar || "https://via.placeholder.com/100"}
-                    alt={user.name}
-                    className="w-20 h-20 rounded-full mb-3"
-                />
-            </div>
-            <h2 className="text-lg font-bold">{user.name}</h2>
-            <p className="text-gray-600">{user.email}</p>
-
+        <div
+            key={user._id}
+            className="relative p-4 border rounded shadow-md cursor-pointer hover:shadow-lg"
+            onClick={() => onClick(user)}
+        >
+            {/* 🟢 Icon trạng thái Online */}
+            {isOnline && (
+                <span className="absolute top-2 right-2 w-4 h-4 bg-green-500 rounded-full"></span>
+            )}
+            <img
+                src={user.avatar || "default-avatar.png"}
+                alt="Avatar"
+                className="w-16 h-16 rounded-full mx-auto"
+            />
+            <h3 className="text-xl font-semibold text-center">{user.name}</h3>
+            <p className="text-center text-gray-600">{user.email}</p>
         </div>
     );
 };

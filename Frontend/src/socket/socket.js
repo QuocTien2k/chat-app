@@ -35,6 +35,17 @@ export const emitUserOnline = (userId) => {
   }
 };
 
+// 📌 Lắng nghe danh sách online từ server
 export const listenOnlineUsers = (callback) => {
-  socket.on("online-users", callback);
+  socket.on("online-users", (data) => {
+    console.log("👥 Cập nhật danh sách online:", data);
+    callback(data); // Gửi dữ liệu về cho component xử lý
+  });
+};
+
+export const disconnectSocket = () => {
+  if (socket.connected && socket.auth?.userId) {
+    socket.emit("user-offline", socket.auth.userId); // 🛑 Gửi sự kiện "user-offline"
+  }
+  socket.disconnect(); // Ngắt kết nối socket
 };
