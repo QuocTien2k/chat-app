@@ -2,28 +2,39 @@ const express = require("express");
 const router = express.Router();
 const { sendMessage, getMessages } = require("../controllers/chatController");
 const { check, validationResult } = require("express-validator");
+const mongoose = require("mongoose");
 
-// 📌 Middleware kiểm tra ObjectId hợp lệ
-const validateObjectId = [
-  check("sender").isMongoId().withMessage("Sender ID không hợp lệ!"),
-  check("receiver").isMongoId().withMessage("Receiver ID không hợp lệ!"),
-];
+module.exports = (io) => {
+  // 📌 Middleware kiểm tra ObjectId hợp lệ
+  const validateObjectId = [
+    check("senderId").isMongoId().withMessage("Sender ID không hợp lệ!"),
+    check("receiverId").isMongoId().withMessage("Receiver ID không hợp lệ!"),
+  ];
 
-// 📌 Route gửi tin nhắn
-router.post("/send", sendMessage);
+  // 📌 Middleware kiểm tra ID trong params
+  const validateParamsId = (req, res, next) => {
+    const { senderId, receiverId } = req.params;
 
-// 📌 Route lấy tin nhắn giữa 2 user
-router.get(
-  "/:sender/:receiver",
-  validateObjectId,
-  (req, res, next) => {
+    if (
+      !mongoose.isValidObjectId(senderId) ||
+      !mongoose.isValidObjectId(receiverId)
+    ) {
+      return res.status(400).json({ message: "ID không hợp lệ!" });
+    }
+    next();
+  };
+
+  // 📌 Route gửi tin nhắn (truyền io vào sendMessage)
+  router.post("/send", validateObjectId, (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
-    next();
-  },
-  getMessages
-);
+    sendMessage(req, res, io);
+  });
 
-module.exports = router;
+  // 📌 Route lấy tin nhắn giữa 2 user
+  router.get("/:senderId/:receiverId", validateParamsId, getMessages);
+
+  return router;
+};

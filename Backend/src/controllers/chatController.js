@@ -2,37 +2,18 @@ const Message = require("../models/Message");
 const mongoose = require("mongoose");
 
 // 📌 API gửi tin nhắn
-const sendMessage = async (req, res) => {
+const sendMessage = async (req, res, io) => {
   try {
-    let { sender, receiver, content } = req.body;
+    let { senderId, receiverId, content } = req.body;
 
-    if (!sender || !receiver || !content.trim()) {
+    if (!senderId || !receiverId || !content.trim()) {
       return res.status(400).json({ message: "Thiếu thông tin tin nhắn!" });
     }
 
-    // Kiểm tra ID hợp lệ
-    if (
-      !mongoose.isValidObjectId(sender) ||
-      !mongoose.isValidObjectId(receiver)
-    ) {
-      return res.status(400).json({ message: "ID không hợp lệ!" });
-    }
+    const message = await Message.create({ senderId, receiverId, content });
 
-    // 📌 Lưu tin nhắn vào database
-    const message = await Message.create({ sender, receiver, content });
-
-    // 📌 Gửi tin nhắn realtime nếu người nhận đang online
-    const io = req.app.get("socketio");
-    const onlineUsers = req.app.get("onlineUsers");
-    const receiverSocketId = onlineUsers.get(receiver);
-
-    if (receiverSocketId) {
-      //console.log(`📩 Gửi tin nhắn realtime đến ${receiverSocketId}`);
-      io.to(receiverSocketId).emit("receiveMessage", message);
-    }
-
-    // 📌 Thông báo (chỉ emit, Frontend sẽ hiển thị thông báo)
-    io.emit("newMessageNotification", { sender, receiver });
+    // 📌 Gửi tin nhắn realtime đến người nhận
+    io.to(receiverId).emit("receive_message", message); // 👈 Truyền đúng event
 
     res.status(201).json(message);
   } catch (error) {
@@ -44,22 +25,28 @@ const sendMessage = async (req, res) => {
 // 📌 API lấy tin nhắn giữa 2 user
 const getMessages = async (req, res) => {
   try {
-    const { sender, receiver } = req.params;
+    const { senderId, receiverId } = req.params;
 
     // Kiểm tra ID hợp lệ
     if (
-      !mongoose.isValidObjectId(sender) ||
-      !mongoose.isValidObjectId(receiver)
+      !mongoose.isValidObjectId(senderId) ||
+      !mongoose.isValidObjectId(receiverId)
     ) {
       return res.status(400).json({ message: "ID không hợp lệ!" });
     }
 
+    // 📌 Truy vấn tin nhắn giữa 2 user
     const messages = await Message.find({
       $or: [
-        { sender, receiver },
-        { sender: receiver, receiver: sender },
+        { senderId, receiverId },
+        { senderId: receiverId, receiverId: senderId },
       ],
-    }).sort({ createdAt: 1 }); // Mới nhất trước
+    })
+      .sort({ createdAt: -1 }) // Tin nhắn mới nhất trước
+      .populate("senderId", "name") // Lấy thông tin user gửi
+      .populate("receiverId", "name") // Lấy thông tin user nhận
+      .select("-__v") // Không lấy trường __v
+      .lean(); // Trả về JSON thuần để tăng hiệu suất
 
     res.status(200).json(messages);
   } catch (error) {
