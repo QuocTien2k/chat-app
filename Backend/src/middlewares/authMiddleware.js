@@ -19,7 +19,7 @@ const protect = async (req, res, next) => {
     const user = await User.findById(decoded.id).select("-password").lean();
     if (!user) return sendError("Người dùng không tồn tại");
 
-    console.log("✅ Middleware tìm thấy user:", user);
+    //console.log("✅ Middleware tìm thấy user:", user);
     req.user = user; // Lưu user vào request
     next();
   } catch (error) {

@@ -71,6 +71,13 @@ io.on("connection", (socket) => {
       disconnectedUserId
     );
   });
+
+  // 📌 Khi user offline, client sẽ gửi sự kiện "user-offline"
+  socket.on("user-offline", (userId) => {
+    onlineUsers.delete(userId);
+    io.emit("online-users", Array.from(onlineUsers)); // Cập nhật danh sách online
+    console.log("❌ User offline:", userId);
+  });
 });
 
 /*
