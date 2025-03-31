@@ -93,7 +93,7 @@ const loginUser = async (req, res) => {
 // 📌 Đăng xuất người dùng
 const logoutUser = async (req, res) => {
   try {
-    console.log("🔍 User từ middleware:", req.user); // Debug
+    //console.log("🔍 User từ middleware:", req.user); // Debug
     const user = await User.findByIdAndUpdate(
       req.user._id,
       { status: "offline" },
@@ -103,7 +103,7 @@ const logoutUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "Người dùng không tồn tại" });
     }
-    console.log("✅ Cập nhật trạng thái offline thành công:", user);
+    //console.log("✅ Cập nhật trạng thái offline thành công:", user);
     res.json({ message: "Đăng xuất thành công" });
   } catch (error) {
     console.error("Lỗi khi đăng xuất:", error);
@@ -130,4 +130,18 @@ const getAllUsers = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, loginUser, logoutUser, getAllUsers };
+// Lấy thông tin 1 user
+const getUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("-password"); // Loại bỏ password
+    if (!user)
+      return res.status(404).json({ message: "Người dùng không tồn tại!" });
+
+    res.json(user);
+  } catch (error) {
+    console.error("Lỗi khi lấy thông tin user:", error);
+    res.status(500).json({ message: "Lỗi server!" });
+  }
+};
+
+module.exports = { registerUser, loginUser, logoutUser, getAllUsers, getUser };

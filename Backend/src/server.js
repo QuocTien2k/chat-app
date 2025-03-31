@@ -1,7 +1,6 @@
 require("dotenv").config();
 const express = require("express");
 const connectDB = require("./config/db");
-
 const authRoutes = require("./routes/authRoutes");
 const { Server } = require("socket.io");
 const http = require("http");
@@ -31,9 +30,17 @@ const chatRoutes = require("./routes/chatRoutes")(io);
 app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
 
+const onlineUsers = new Map(); // Lưu userId -> socketId
 //socket kết nối
 io.on("connection", (socket) => {
-  //console.log("🟢 User connected:", socket.id);
+  console.log("🟢 User connected:", socket.id);
+
+  // 📌 Khi user đăng nhập, client sẽ gửi sự kiện "user-online"
+  socket.on("user-online", (userId) => {
+    onlineUsers.set(userId, socket.id);
+    io.emit("online-users", Array.from(onlineUsers.keys())); // Gửi danh sách online
+    console.log("✅ User online:", userId);
+  });
 
   socket.on("join_room", (data) => {
     socket.join(data); // Tham gia room theo ID
@@ -44,8 +51,25 @@ io.on("connection", (socket) => {
     socket.to(data.room).emit("receive_message", data);
   });
 
+  // 📌 Khi user mất kết nối
   socket.on("disconnect", () => {
-    //console.log("❌ User disconnected:", socket.id);
+    let disconnectedUserId = null;
+
+    for (let [userId, socketId] of onlineUsers.entries()) {
+      if (socketId === socket.id) {
+        disconnectedUserId = userId;
+        onlineUsers.delete(userId);
+        break;
+      }
+    }
+
+    io.emit("online-users", Array.from(onlineUsers.keys())); // Cập nhật danh sách online
+    console.log(
+      "❌ User disconnected:",
+      socket.id,
+      "UserID:",
+      disconnectedUserId
+    );
   });
 });
 
