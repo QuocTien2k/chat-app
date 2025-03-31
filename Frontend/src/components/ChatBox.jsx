@@ -1,34 +1,34 @@
-import { useState, useEffect, useRef } from "react";
+import { useRef, useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import axios from "axios";
 
 const ChatBox = ({ user, currentUser, onClose }) => {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
-    const messagesEndRef = useRef(null); // 🔹 Tạo ref
-    const socket = useRef(null); // Dùng useRef để lưu socket
+    const [typing, setTyping] = useState(false);
+    const messagesEndRef = useRef(null);
+    const socket = useRef(null);
 
-    //console.log("ChatBox Props:", { currentUser, user });
-
-    // 📌 Kết nối socket 1 lần duy nhất khi component mount
+    // 📌 Kết nối socket 1 lần khi component mount
     useEffect(() => {
         if (!socket.current) {
-            socket.current = io("http://localhost:5000", {
-                transports: ["websocket"],
-            });
+            socket.current = io("http://localhost:5000", { transports: ["websocket"] });
+            console.log("✅ Kết nối socket:", socket.current.id);
 
-            socket.current.emit("joinRoom", { userId: currentUser._id });
-
-            console.log("✅ Kết nối socket:", socket.current.connected);
+            socket.current.emit("joinRoom", currentUser._id);
         }
 
         return () => {
-            socket.current.disconnect();
-            socket.current = null;
+            if (socket.current) {
+                console.log("❌ Ngắt kết nối socket");
+                socket.current.disconnect();
+                socket.current = null;
+            }
         };
-    }, [currentUser._id]);
+    }, []);
 
-    // 📌 Tải tin nhắn từ database khi chọn user chat
+
+    // 📌 Tải tin nhắn khi chọn user
     useEffect(() => {
         const fetchMessages = async () => {
             try {
@@ -40,17 +40,18 @@ const ChatBox = ({ user, currentUser, onClose }) => {
                 console.error("❌ Lỗi tải tin nhắn:", error);
             }
         };
-
         fetchMessages();
     }, [user._id, currentUser._id]);
 
-    // 📌 Nhận tin nhắn realtime từ socket
+    // 📌 Nhận tin nhắn realtime
     useEffect(() => {
         if (!socket.current) return;
 
         const handleReceiveMessage = (message) => {
-            console.log("📩 Tin nhắn nhận được:", message);
-            setMessages((prev) => [...prev, message]);
+            if (message.chatId === `${currentUser._id}-${user._id}` || message.chatId === `${user._id}-${currentUser._id}`) {
+                console.log("📩 Tin nhắn nhận được:", message);
+                setMessages((prev) => [...prev, message]);
+            }
         };
 
         socket.current.on("receiveMessage", handleReceiveMessage);
@@ -60,7 +61,7 @@ const ChatBox = ({ user, currentUser, onClose }) => {
                 socket.current.off("receiveMessage", handleReceiveMessage);
             }
         };
-    }, []);
+    }, [user._id, currentUser._id]);
 
     // 📩 Gửi tin nhắn
     const sendMessage = async () => {
@@ -78,14 +79,48 @@ const ChatBox = ({ user, currentUser, onClose }) => {
             });
 
             setMessages((prev) => [...prev, res.data]);
-
+            socket.current.emit("sendMessage", res.data);
             setNewMessage("");
         } catch (error) {
             console.error("❌ Lỗi gửi tin nhắn:", error);
         }
     };
 
-    // 🔹 Hàm tự động cuộn xuống cuối khi tin nhắn thay đổi
+    // 🔹 Xử lý sự kiện typing
+    const handleTyping = (e) => {
+        setNewMessage(e.target.value);
+        if (!typing) {
+            setTyping(true);
+            socket.current.emit("typing", { sender: currentUser._id, receiver: user._id });
+        }
+    };
+
+    useEffect(() => {
+        if (!socket.current) return;
+
+        const handleReceiveMessage = (message) => {
+            console.log("📩 Tin nhắn nhận được:", message);
+            setMessages((prev) => [...prev, message]);
+        };
+
+        const handleTypingStatus = ({ sender }) => {
+            if (sender === user._id) setTyping(true);
+        };
+
+        socket.current.on("receiveMessage", handleReceiveMessage);
+        socket.current.on("typing", handleTypingStatus);
+
+        return () => {
+            if (socket.current) {
+                socket.current.off("receiveMessage", handleReceiveMessage);
+                socket.current.off("typing", handleTypingStatus);
+            }
+        };
+    }, []);
+
+
+
+    // 🔹 Cuộn xuống cuối khi có tin nhắn mới
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
@@ -97,6 +132,7 @@ const ChatBox = ({ user, currentUser, onClose }) => {
                 <div className="flex items-center gap-2">
                     <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full" />
                     <span className="font-bold">{user.name}</span>
+                    {typing && <span className="text-sm">(Đang nhập...)</span>}
                 </div>
                 <span className="cursor-pointer text-xl" onClick={() => onClose(user._id)}>❌</span>
             </div>
@@ -114,7 +150,6 @@ const ChatBox = ({ user, currentUser, onClose }) => {
                         {msg.content}
                     </div>
                 ))}
-                {/* 🔹 Phần tử ẩn dùng để cuộn */}
                 <div ref={messagesEndRef} />
             </div>
 
@@ -125,7 +160,7 @@ const ChatBox = ({ user, currentUser, onClose }) => {
                     className="flex-1 border rounded-full px-3 py-2 outline-none"
                     placeholder="Nhập tin nhắn..."
                     value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
+                    onChange={handleTyping}
                     onKeyDown={(e) => e.key === "Enter" && sendMessage()}
                 />
                 <button className="bg-blue-500 text-white px-4 py-2 rounded-full" onClick={sendMessage}>

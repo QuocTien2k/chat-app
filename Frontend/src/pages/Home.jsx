@@ -1,152 +1,77 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import Card from "../components/Card";
-import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
-import { io } from "socket.io-client";
-import ChatBox from "../components/ChatBox";
+import { useNavigate } from "react-router-dom";
 
-const socket = io("http://localhost:5000"); // 🔥 Kết nối đến server WebSocket
 const Home = () => {
+    const { user, token, logout } = useAuth();
     const [users, setUsers] = useState([]);
     const navigate = useNavigate();
-    const currentUser = JSON.parse(localStorage.getItem("user"));
-    //console.log(user);
-    const [onlineUsers, setOnlineUsers] = useState({}); // Lưu trạng thái online
-    const [chatUsers, setChatUsers] = useState([]);
 
+    // 📌 Fetch danh sách users từ API
     useEffect(() => {
         const fetchUsers = async () => {
-            const token = localStorage.getItem("token"); // ✅ Lấy token trực tiếp khi cần
             try {
-                const { data } = await axios.get("http://localhost:5000/api/auth/users", {
-                    headers: token ? { Authorization: `Bearer ${token}` } : {},
-                });
-
-                const loggedInUser = JSON.parse(localStorage.getItem("user"));
-                const filteredUsers = loggedInUser ? data.filter(u => u._id !== loggedInUser._id) : data;
-                setUsers(filteredUsers);
+                const { data } = await axios.get("http://localhost:5000/api/auth/users");
+                // Nếu đã đăng nhập, loại bỏ user đang đăng nhập khỏi danh sách
+                setUsers(user ? data.filter(u => u._id !== user._id) : data);
             } catch (error) {
-                console.error("❌ Lỗi khi lấy danh sách user:", error);
+                console.error("Lỗi lấy danh sách users:", error);
             }
         };
 
         fetchUsers();
+    }, [user]); // Khi user thay đổi, gọi lại API
 
-        // 🟢 Khi user vào trang, gửi ID đến server để đánh dấu online
-        const loggedInUser = JSON.parse(localStorage.getItem("user"));
-        if (loggedInUser) {
-            socket.emit("join", loggedInUser._id);
-        }
-
-        // 📌 Lắng nghe sự kiện update trạng thái từ server
-        socket.on("updateUserStatus", ({ userId, status }) => {
-            setOnlineUsers((prev) => ({ ...prev, [userId]: status }));
-        });
-
-        return () => {
-            socket.off("updateUserStatus");
-        };
-    }, []); // chạy 1 lần khi component mount
-
-
-    const handleLogout = async () => {
-        try {
-            const token = localStorage.getItem("token");
-            console.log(token);
-
-            if (!token) {
-                console.log("⚠️ Không tìm thấy token, có thể đã đăng xuất.");
-                return;
-            }
-
-            await axios.post("http://localhost:5000/api/auth/logout", {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            // Xóa token & user khỏi localStorage
-            localStorage.removeItem("token");
-            localStorage.removeItem("user");
-
-            navigate(0);
-        } catch (error) {
-            toast.error("Lỗi khi đăng xuất! ", error);
-        }
-    };
-
-    // Hàm mở chat
-    const max_chatboxs = 3; // Giới hạn số lượng chatbox mở cùng lúc
-    const handleOpenChat = (otherUser) => {
-        const currentUser = JSON.parse(localStorage.getItem("user")); // Lấy user đang đăng nhập
-
-        //console.log("🟢 Người mở chat (currentUser):", currentUser);
-        //console.log("🔵 Người được chọn (otherUser):", otherUser);
-
-        if (!otherUser || !otherUser._id) {
-            //console.error("❌ Không có thông tin người chat:", otherUser);
+    // 📌 Khi click vào Card user
+    const handleUserClick = (selectedUser) => {
+        if (!token) {
+            toast.warning("Bạn cần đăng nhập để nhắn tin!");
             return;
         }
 
-        if (otherUser._id === currentUser._id) {
-            console.warn("⚠️ Không thể chat với chính mình!");
-            return;
-        }
-
-        setChatUsers((prev) => {
-            if (prev.some((u) => u._id === otherUser._id)) {
-                //console.log("✅ Đã có trong danh sách chat.");
-                return prev;
-            }
-
-            if (prev.length >= max_chatboxs) {
-                //console.log("🔄 Giới hạn chatbox, xóa chatbox đầu tiên.");
-                return [...prev.slice(1), otherUser];
-            }
-
-            //console.log("➕ Thêm user mới vào danh sách chat.");
-            return [...prev, otherUser];
-        });
-    };
-
-    // Hàm đóng chat
-    const handleCloseChat = (userId) => {
-        setChatUsers((prev) => prev.filter((user) => user._id !== userId));
+        // 🟢 Nếu đã đăng nhập, điều hướng đến trang chat (ví dụ)
+        navigate(`/chat/${selectedUser._id}`);
     };
 
     return (
-        <div className="p-5">
-            {currentUser && <h1 className="text-2xl font-bold text-center mb-5">Xin chào, {currentUser?.name}</h1>}
-            <div className="my-3">
-                {currentUser ? (
-                    <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded cursor-pointer">
-                        Đăng Xuất
+        <div className="container mx-auto p-6">
+            {user && <h2 className="text-2xl font-bold">Xin chào, {user.name} và đang {user.status}!</h2>}
+            <h2 className="text-2xl font-bold m-4">Danh Sách Users</h2>
+
+            {/* 📌 Danh sách Users */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {users.map((u) => (
+                    <div key={u._id} className="p-4 border rounded shadow-md cursor-pointer hover:shadow-lg"
+                        onClick={() => handleUserClick(u)}>
+                        <img src={u.avatar || "default-avatar.png"} alt="Avatar" className="w-16 h-16 rounded-full mx-auto" />
+                        <h3 className="text-xl font-semibold text-center">{u.name}</h3>
+                        <p className="text-center text-gray-600">{u.email}</p>
+                    </div>
+                ))}
+            </div>
+
+            {/* 📌 Nếu chưa đăng nhập, hiển thị nút đăng nhập */}
+            {!user ? (
+                <div className="text-center mt-6">
+                    <button
+                        onClick={() => navigate("/login")}
+                        className="bg-blue-500 text-white px-4 py-2 rounded-lg cursor-pointer"
+                    >
+                        Đăng nhập
                     </button>
-                ) : (
-                    <Link to="/login" className="bg-blue-500 text-white px-4 py-2 rounded cursor-pointer">
-                        Đăng Nhập
-                    </Link>
-                )}
-            </div>
-            <h1 className="text-2xl font-bold text-center mb-5">Danh sách User</h1>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {users.map((otherUser) => (
-                    <Card
-                        key={otherUser._id}
-                        user={otherUser} // Đây là user khác, không phải currentUser
-                        isOnline={onlineUsers[otherUser._id] === "online"}
-                        onSelect={() => handleOpenChat(otherUser)}
-                    />
-                ))}
-            </div>
-
-            {/* Hiển thị các cửa sổ chat đang mở */}
-            <div className="fixed bottom-4 right-4 flex gap-4">
-                {chatUsers.map((chatUser) => (
-                    <ChatBox key={chatUser._id} user={chatUser} currentUser={currentUser} onClose={handleCloseChat} />
-
-                ))}
-            </div>
-
+                </div>
+            ) : (
+                <div className="text-center mt-6">
+                    <button
+                        onClick={logout}
+                        className="bg-blue-500 text-white px-4 py-2 rounded-lg cursor-pointer"
+                    >
+                        Đăng xuất
+                    </button>
+                </div>
+            )}
         </div>
     );
 };

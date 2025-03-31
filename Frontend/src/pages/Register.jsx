@@ -1,5 +1,5 @@
 import { useState } from "react";
-import axios from "axios";
+import { useAuth } from "../context/AuthContext"; // ✅ Import AuthContext
 import { toast } from "react-toastify";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -7,14 +7,15 @@ const Register = () => {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const navigate = useNavigate();
+    const { register } = useAuth(); // ✅ Gọi hàm register từ AuthContext
+    const navigate = useNavigate(); // ✅ Điều hướng
 
     const handleRegister = async (e) => {
         e.preventDefault();
         try {
-            await axios.post("http://localhost:5000/api/auth/register", { name, email, password });
+            await register(name, email, password);
             toast.success("Đăng ký thành công! Vui lòng đăng nhập.");
-            navigate("/login"); // ✅ Chuyển về trang Login.jsx
+            navigate("/login"); // ✅ Chuyển hướng về trang đăng nhập
         } catch (error) {
             toast.error(error.response?.data?.message || "Đăng ký thất bại! Vui lòng thử lại.");
         }
@@ -52,7 +53,7 @@ const Register = () => {
                     Đăng Ký
                 </button>
                 <div className="my-3">
-                    <p>Đã có tài khoản? <Link to="/login" >Đăng nhập</Link></p>
+                    <p>Đã có tài khoản? <Link to="/login">Đăng nhập</Link></p>
                 </div>
             </form>
         </div>

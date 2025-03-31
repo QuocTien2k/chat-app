@@ -1,36 +1,18 @@
 import { useState } from "react";
-import axios from "axios";
-import { Link } from "react-router-dom";
-import { toast } from "react-toastify";
+import { useAuth } from "../context/AuthContext"; // ✅ Import AuthContext
+import { Link, useNavigate } from "react-router-dom";
 
 const Login = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const { login } = useAuth(); // ✅ Gọi hàm login từ AuthContext
+    const navigate = useNavigate(); // ✅ Điều hướng
 
     const handleLogin = async (e) => {
         e.preventDefault();
-        try {
-            const { data } = await axios.post("http://localhost:5000/api/auth/login", {
-                email,
-                password,
-            });
-            //console.log("📌 Dữ liệu nhận từ API:", data);
 
-            localStorage.setItem("token", data.token); // ✅ Lưu token vào localStorage
-            localStorage.setItem("user", JSON.stringify({ // ✅ Lưu user vào localStorage
-                _id: data._id,
-                name: data.name,
-                email: data.email,
-                avatar: data.avatar,
-                status: data.status,
-            }));
-
-            window.location.href = "/"; // ✅ Chuyển về trang Home
-        } catch (error) {
-            //console.error("Đăng nhập thất bại! ", error);
-            toast.error(error.response?.data?.message);
-
-        }
+        await login({ email, password });
+        navigate("/"); // ✅ Chuyển hướng về trang chủ
     };
 
     return (
@@ -62,6 +44,7 @@ const Login = () => {
             </form>
         </div>
     );
-};
+}
+
 
 export default Login;
