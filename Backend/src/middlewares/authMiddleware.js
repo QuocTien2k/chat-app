@@ -1,60 +1,51 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
+// 📌 Middleware bảo vệ API
 const protect = async (req, res, next) => {
-  let token;
-  if (req.headers.authorization?.startsWith("Bearer")) {
-    try {
-      token = req.headers.authorization.split(" ")[1];
+  const sendError = (message) => res.status(401).json({ message }); // ✅ Hàm xử lý lỗi chung
 
-      // Giải mã token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  if (!req.headers.authorization?.startsWith("Bearer")) {
+    return sendError("Không có token, không được phép truy cập");
+  }
 
-      // Kiểm tra user có tồn tại không
-      const user = await User.findById(decoded.id).select("-password");
-      if (!user) {
-        return res.status(401).json({ message: "Người dùng không tồn tại" });
-      }
+  try {
+    const token = req.headers.authorization.split(" ")[1];
 
-      req.user = user;
-      next();
-    } catch (error) {
-      if (error.name === "TokenExpiredError") {
-        return res
-          .status(401)
-          .json({ message: "Token đã hết hạn, vui lòng đăng nhập lại" });
-      }
-      return res.status(401).json({ message: "Token không hợp lệ" });
-    }
-  } else {
-    res
-      .status(401)
-      .json({ message: "Không có token, không được phép truy cập" });
+    // 🔥 Giải mã token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // 🔥 Kiểm tra user có tồn tại không
+    const user = await User.findById(decoded.id).select("-password").lean();
+    if (!user) return sendError("Người dùng không tồn tại");
+
+    console.log("✅ Middleware tìm thấy user:", user);
+    req.user = user; // Lưu user vào request
+    next();
+  } catch (error) {
+    return sendError(
+      error.name === "TokenExpiredError"
+        ? "Token đã hết hạn, vui lòng đăng nhập lại"
+        : "Token không hợp lệ"
+    );
   }
 };
 
+// 📌 Middleware API công khai
 const protectOptional = async (req, res, next) => {
-  let token = req.headers.authorization?.split(" ")[1];
-
-  //console.log("📌 Middleware nhận Token:",token ? token : "❌ Không có token!");
+  const token = req.headers.authorization?.split(" ")[1];
+  req.user = null; // Mặc định là null
 
   if (token) {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      //console.log("📌 Token giải mã:", decoded);
-
-      req.user = await User.findById(decoded.id).select("-password");
-      //console.log("📌 User trong middleware:",req.user ? req.user : "❌ Không tìm thấy user!");
+      req.user = await User.findById(decoded.id).select("-password").lean();
     } catch (error) {
-      //console.error("❌ Lỗi xác thực token:", error.message);
-      req.user = null; // Nếu token không hợp lệ, tiếp tục nhưng không có user
+      req.user = null; // Token không hợp lệ -> không có user
     }
-  } else {
-    //console.log("❌ Không có token, req.user sẽ là null!");
-    req.user = null;
   }
 
-  next();
+  next(); // Tiếp tục xử lý request
 };
 
 module.exports = { protect, protectOptional };
