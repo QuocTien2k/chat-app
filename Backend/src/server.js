@@ -31,24 +31,35 @@ app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
 
 const onlineUsers = new Map(); // Lưu userId -> socketId
-//socket kết nối
+
 io.on("connection", (socket) => {
   console.log("🟢 User connected:", socket.id);
 
-  // 📌 Khi user đăng nhập, client sẽ gửi sự kiện "user-online"
+  // 📌 Khi user login
   socket.on("user-online", (userId) => {
     onlineUsers.set(userId, socket.id);
-    io.emit("online-users", Array.from(onlineUsers.keys())); // Gửi danh sách online
+    io.emit("online-users", Array.from(onlineUsers.keys())); // Cập nhật danh sách
     console.log("✅ User online:", userId);
   });
 
-  socket.on("join_room", (data) => {
-    socket.join(data); // Tham gia room theo ID
-    //console.log("✅ User joined room:", data);
+  // 📌 Khi user tham gia phòng chat
+  socket.on("join_room", (roomId) => {
+    socket.join(roomId);
   });
 
+  // 📌 Gửi tin nhắn (Sửa lỗi gửi tin nhắn)
   socket.on("send_message", (data) => {
-    socket.to(data.room).emit("receive_message", data);
+    const { senderId, receiverId, content } = data;
+
+    // Tìm socketId của người nhận
+    const receiverSocketId = onlineUsers.get(receiverId);
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("receive_message", {
+        senderId,
+        content,
+        createdAt: new Date(),
+      });
+    }
   });
 
   // 📌 Khi user mất kết nối
@@ -63,7 +74,7 @@ io.on("connection", (socket) => {
       }
     }
 
-    io.emit("online-users", Array.from(onlineUsers.keys())); // Cập nhật danh sách online
+    io.emit("online-users", Array.from(onlineUsers.keys())); // Cập nhật danh sách
     console.log(
       "❌ User disconnected:",
       socket.id,
@@ -72,10 +83,10 @@ io.on("connection", (socket) => {
     );
   });
 
-  // 📌 Khi user offline, client sẽ gửi sự kiện "user-offline"
+  // 📌 Khi user chủ động offline
   socket.on("user-offline", (userId) => {
     onlineUsers.delete(userId);
-    io.emit("online-users", Array.from(onlineUsers)); // Cập nhật danh sách online
+    io.emit("online-users", Array.from(onlineUsers.keys())); // Đúng
     console.log("❌ User offline:", userId);
   });
 });
