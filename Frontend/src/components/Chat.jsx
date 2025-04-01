@@ -4,10 +4,16 @@ import ScrollToBottom from "react-scroll-to-bottom";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
 
-const Chat = ({ socket, selectedUser, onClose }) => {
+const Chat = ({ socket, selectedUser, onClose, setNotifications }) => {
     const { user, token } = useAuth();
     const [message, setMessage] = useState("");
     const [messages, setMessages] = useState([]);
+
+
+    useEffect(() => {
+        // Lọc thông báo đã được mở chat
+        setNotifications((prev) => prev.filter((notif) => notif.senderId !== selectedUser._id));
+    }, [selectedUser, setNotifications]);
 
     // 📌 Lấy danh sách tin nhắn từ API khi mở hộp chat
     useEffect(() => {
