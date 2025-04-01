@@ -5,6 +5,8 @@ const authRoutes = require("./routes/authRoutes");
 const { Server } = require("socket.io");
 const http = require("http");
 const cors = require("cors");
+const User = require("./models/User");
+
 //const Message = require("./models/Message");
 
 const app = express();
@@ -36,29 +38,55 @@ io.on("connection", (socket) => {
   console.log("🟢 User connected:", socket.id);
 
   // 📌 Khi user login
-  socket.on("user-online", (userId) => {
-    onlineUsers.set(userId, socket.id);
-    io.emit("online-users", Array.from(onlineUsers.keys())); // Cập nhật danh sách
-    console.log("✅ User online:", userId);
+  socket.on("user-online", async (userId) => {
+    try {
+      // Đảm bảo rằng thông tin về user được cập nhật vào onlineUsers trước khi tiếp tục
+      onlineUsers.set(userId, socket.id);
+
+      // Phát sự kiện update cho tất cả các client kết nối để cập nhật lại danh sách user online
+      io.emit("update_online_users", Array.from(onlineUsers.keys()));
+      console.log("✅ User online:", userId, "Socket ID:", socket.id);
+    } catch (error) {
+      console.error("❌ Lỗi khi cập nhật trạng thái user online:", error);
+    }
   });
 
-  // 📌 Khi user tham gia phòng chat
-  socket.on("join_room", (roomId) => {
-    socket.join(roomId);
-  });
-
-  // 📌 Gửi tin nhắn (Sửa lỗi gửi tin nhắn)
-  socket.on("send_message", (data) => {
+  // 📌 Gửi tin nhắn
+  socket.on("send_message", async (data) => {
     const { senderId, receiverId, content } = data;
+    const receiverSocketId = onlineUsers.get(receiverId); // Tìm socketId của người nhận
 
-    // Tìm socketId của người nhận
-    const receiverSocketId = onlineUsers.get(receiverId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("receive_message", {
-        senderId,
-        content,
-        createdAt: new Date(),
-      });
+    try {
+      // 📌 Lấy thông tin người gửi
+      const sender = await User.findById(senderId);
+
+      if (!sender) {
+        console.error("❌ Không tìm thấy người gửi!");
+        return;
+      }
+
+      // 📌 Nếu người nhận online, gửi tin nhắn
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("receive_message", {
+          senderId,
+          senderName: sender.name, // Gửi cả tên người gửi
+          content,
+          createdAt: new Date(),
+        });
+
+        // 📌 Gửi thông báo tin nhắn mới
+        io.to(receiverSocketId).emit("new_notification", {
+          senderId,
+          senderName: sender.name, // Thêm tên người gửi
+          content,
+        });
+      } else {
+        console.log(
+          `🔴 Receiver ${receiverId} is offline, saving message for later.`
+        );
+      }
+    } catch (error) {
+      console.error("❌ Lỗi khi gửi tin nhắn:", error);
     }
   });
 
@@ -74,20 +102,15 @@ io.on("connection", (socket) => {
       }
     }
 
-    io.emit("online-users", Array.from(onlineUsers.keys())); // Cập nhật danh sách
-    console.log(
-      "❌ User disconnected:",
-      socket.id,
-      "UserID:",
-      disconnectedUserId
-    );
-  });
-
-  // 📌 Khi user chủ động offline
-  socket.on("user-offline", (userId) => {
-    onlineUsers.delete(userId);
-    io.emit("online-users", Array.from(onlineUsers.keys())); // Đúng
-    console.log("❌ User offline:", userId);
+    if (disconnectedUserId) {
+      io.emit("update_online_users", Array.from(onlineUsers.keys())); // Cập nhật lại trạng thái online
+      console.log(
+        "❌ User disconnected:",
+        socket.id,
+        "UserID:",
+        disconnectedUserId
+      );
+    }
   });
 });
 

@@ -18,6 +18,12 @@ const sendMessage = async (req, res, io) => {
     const receiverSocketId = usersOnline[receiverId]; // 🔹 Tìm socket của người nhận
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("receive_message", message);
+      io.to(receiverSocketId).emit("new_notification", { senderId, content });
+    } else {
+      // Lưu tin nhắn vào database hoặc vào queue để gửi lại khi người nhận online
+      console.log(
+        `Receiver ${receiverId} is offline, save notification for later.`
+      );
     }
 
     res.status(201).json(message);
